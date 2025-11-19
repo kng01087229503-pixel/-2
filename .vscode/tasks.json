@@ -1,0 +1,22 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "npm",
+			"script": "build",
+			"path": "ui",
+			"group": "build",
+			"problemMatcher": [],
+			"label": "npm: build - ui",
+			"detail": "vite build"
+		},
+		{
+			"type": "npm",
+			"script": "dev",
+			"path": "ui",
+			"problemMatcher": [],
+			"label": "npm: dev - ui",
+			"detail": "vite"
+		}
+	]
+}
