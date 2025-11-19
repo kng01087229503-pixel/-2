@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import './App.css'
 
 // 임시 메뉴 데이터
@@ -76,47 +76,54 @@ function App() {
   const [cart, setCart] = useState([])
   const [orders, setOrders] = useState([]) // 주문 목록 (주문하기 화면에서 생성된 주문)
   const [inventory, setInventory] = useState([
-    { menuId: 1, menuName: '아메리카노 (ICE)', stock: 10 },
-    { menuId: 2, menuName: '아메리카노 (HOT)', stock: 10 },
+    { menuId: 1, menuName: '아메리카노(ICE)', stock: 10 },
+    { menuId: 2, menuName: '아메리카노(HOT)', stock: 10 },
     { menuId: 3, menuName: '카페라떼', stock: 10 }
   ])
 
   // 장바구니에 아이템 추가
   const addToCart = (menu, selectedOptions) => {
-    const optionPrice = selectedOptions.reduce((sum, opt) => sum + opt.price, 0)
-    const totalPrice = menu.price + optionPrice
-    const optionNames = selectedOptions.map(opt => opt.name)
+    try {
+      const optionPrice = selectedOptions.reduce((sum, opt) => sum + (opt.price || 0), 0)
+      const totalPrice = menu.price + optionPrice
+      const optionNames = selectedOptions.map(opt => opt.name)
 
-    // 동일한 메뉴+옵션 조합 찾기
-    const existingItemIndex = cart.findIndex(item => 
-      item.menuId === menu.id && 
-      JSON.stringify(item.selectedOptions.map(o => o.optionId).sort()) === 
-      JSON.stringify(selectedOptions.map(o => o.id).sort())
-    )
+      // 동일한 메뉴+옵션 조합 찾기 (JSON.stringify 대신 배열 비교 사용)
+      const selectedOptionIds = selectedOptions.map(o => o.id).sort()
+      const existingItemIndex = cart.findIndex(item => {
+        if (item.menuId !== menu.id) return false
+        const itemOptionIds = item.selectedOptions.map(o => o.optionId).sort()
+        if (itemOptionIds.length !== selectedOptionIds.length) return false
+        return itemOptionIds.every((id, idx) => id === selectedOptionIds[idx])
+      })
 
-    if (existingItemIndex >= 0) {
-      // 기존 아이템 수량 증가
-      const updatedCart = [...cart]
-      updatedCart[existingItemIndex].quantity += 1
-      updatedCart[existingItemIndex].totalPrice = 
-        (updatedCart[existingItemIndex].basePrice + optionPrice) * updatedCart[existingItemIndex].quantity
-      setCart(updatedCart)
-    } else {
-      // 새 아이템 추가
-      const newItem = {
-        menuId: menu.id,
-        menuName: menu.name,
-        basePrice: menu.price,
-        selectedOptions: selectedOptions.map(opt => ({
-          optionId: opt.id,
-          optionName: opt.name,
-          optionPrice: opt.price
-        })),
-        optionNames: optionNames,
-        quantity: 1,
-        totalPrice: totalPrice
+      if (existingItemIndex >= 0) {
+        // 기존 아이템 수량 증가
+        const updatedCart = [...cart]
+        updatedCart[existingItemIndex].quantity += 1
+        updatedCart[existingItemIndex].totalPrice = 
+          (updatedCart[existingItemIndex].basePrice + optionPrice) * updatedCart[existingItemIndex].quantity
+        setCart(updatedCart)
+      } else {
+        // 새 아이템 추가
+        const newItem = {
+          menuId: menu.id,
+          menuName: menu.name,
+          basePrice: menu.price,
+          selectedOptions: selectedOptions.map(opt => ({
+            optionId: opt.id,
+            optionName: opt.name,
+            optionPrice: opt.price
+          })),
+          optionNames: optionNames,
+          quantity: 1,
+          totalPrice: totalPrice
+        }
+        setCart([...cart, newItem])
       }
-      setCart([...cart, newItem])
+    } catch (error) {
+      console.error('장바구니 추가 중 오류가 발생했습니다:', error)
+      alert('장바구니에 추가하는 중 오류가 발생했습니다. 다시 시도해주세요.')
     }
   }
 
@@ -126,10 +133,10 @@ function App() {
     setCart(updatedCart)
   }
 
-  // 총 금액 계산
-  const calculateTotal = () => {
+  // 총 금액 계산 (메모이제이션)
+  const totalAmount = useMemo(() => {
     return cart.reduce((sum, item) => sum + item.totalPrice, 0)
-  }
+  }, [cart])
 
   // 주문하기
   const handleOrder = () => {
@@ -138,33 +145,39 @@ function App() {
       return
     }
 
-    const newOrder = {
-      id: Date.now(),
-      items: cart.map(item => ({
-        menuId: item.menuId,
-        menuName: item.menuName,
-        options: item.optionNames,
-        quantity: item.quantity,
-        price: item.totalPrice
-      })),
-      totalAmount: calculateTotal(),
-      orderDate: new Date(),
-      status: 'pending' // pending -> received -> inProgress -> completed
-    }
+    try {
+      const newOrder = {
+        id: Date.now(),
+        items: cart.map(item => ({
+          menuId: item.menuId,
+          menuName: item.menuName,
+          options: item.optionNames,
+          quantity: item.quantity,
+          price: item.totalPrice
+        })),
+        totalAmount: totalAmount,
+        orderDate: new Date(),
+        status: 'pending' // pending -> received -> inProgress -> completed
+      }
 
-    setOrders([newOrder, ...orders])
-    alert(`주문이 완료되었습니다!\n총 금액: ${calculateTotal().toLocaleString()}원`)
-    setCart([])
+      setOrders([newOrder, ...orders])
+      alert(`주문이 완료되었습니다!\n총 금액: ${totalAmount.toLocaleString()}원`)
+      setCart([])
+    } catch (error) {
+      console.error('주문 처리 중 오류가 발생했습니다:', error)
+      alert('주문 처리 중 오류가 발생했습니다. 다시 시도해주세요.')
+    }
   }
 
-  // 주문 통계 계산
-  const getOrderStatistics = () => {
+  // 주문 통계 계산 (메모이제이션)
+  const orderStatistics = useMemo(() => {
     const total = orders.length
-    const received = orders.filter(o => o.status === 'received').length
+    // pending 상태도 주문 접수로 카운트 (주문이 들어오면 처음에는 주문 접수 상태)
+    const received = orders.filter(o => o.status === 'received' || o.status === 'pending').length
     const inProgress = orders.filter(o => o.status === 'inProgress').length
     const completed = orders.filter(o => o.status === 'completed').length
     return { total, received, inProgress, completed }
-  }
+  }, [orders])
 
   // 주문 상태 변경
   const updateOrderStatus = (orderId, newStatus) => {
@@ -200,14 +213,14 @@ function App() {
             <MenuSection menus={menuData} onAddToCart={addToCart} />
             <CartSection 
               cart={cart} 
-              total={calculateTotal()} 
+              total={totalAmount} 
               onRemove={removeFromCart}
               onOrder={handleOrder}
             />
           </>
         ) : (
           <AdminPage
-            statistics={getOrderStatistics()}
+            statistics={orderStatistics}
             inventory={inventory}
             orders={orders}
             onUpdateInventory={updateInventory}
@@ -326,7 +339,7 @@ function CartSection({ cart, total, onRemove, onOrder }) {
             <p className="empty-cart">장바구니가 비어있습니다.</p>
           ) : (
             cart.map((item, index) => (
-              <div key={index} className="cart-item">
+              <div key={`${item.menuId}-${item.selectedOptions.map(o => o.optionId).join('-')}-${index}`} className="cart-item">
                 <div className="cart-item-left">
                   <span className="cart-item-text">
                     {item.menuName}
@@ -383,12 +396,20 @@ function AdminPage({ statistics, inventory, orders, onUpdateInventory, onUpdateO
 
   // 날짜 포맷팅
   const formatDate = (date) => {
-    const d = new Date(date)
-    const month = d.getMonth() + 1
-    const day = d.getDate()
-    const hours = d.getHours()
-    const minutes = d.getMinutes().toString().padStart(2, '0')
-    return `${month}월 ${day}일 ${hours}:${minutes}`
+    try {
+      const d = new Date(date)
+      if (isNaN(d.getTime())) {
+        return '날짜 정보 없음'
+      }
+      const month = d.getMonth() + 1
+      const day = d.getDate()
+      const hours = d.getHours()
+      const minutes = d.getMinutes().toString().padStart(2, '0')
+      return `${month}월 ${day}일 ${hours}:${minutes}`
+    } catch (error) {
+      console.error('날짜 포맷팅 오류:', error)
+      return '날짜 정보 없음'
+    }
   }
 
   return (
