@@ -1,7 +1,8 @@
 # Dependencies
 node_modules/
+# package-lock.json은 버전 관리에 포함하는 것을 권장합니다
 
-# Environment variables
+# Environment variables (중요: 비밀번호 포함)
 .env
 .env.local
 .env.*.local
@@ -18,37 +19,36 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# Build outputs
-dist/
-dist-ssr/
-build/
-*.tsbuildinfo
-
 # OS files
 .DS_Store
 .DS_Store?
 ._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
 Desktop.ini
-ehthumbs.db
 
-# Editor directories and files
+# IDE and Editor files
 .vscode/
-!.vscode/extensions.json
 .idea/
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
 *.swp
 *.swo
 *~
 *.sublime-project
 *.sublime-workspace
+*.code-workspace
+
+# Build outputs
+dist/
+build/
+dist-ssr/
+*.tsbuildinfo
 
 # Testing
 coverage/
 .nyc_output/
+*.lcov
 
 # Temporary files
 *.tmp
@@ -56,5 +56,13 @@ coverage/
 .cache/
 .temp/
 
+# Database
+*.sqlite
+*.sqlite3
+*.db
+
 # Misc
-*.local
+*.pem
+*.key
+*.cert
+

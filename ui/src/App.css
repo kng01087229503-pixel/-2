@@ -178,22 +178,22 @@
 .menu-options {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
+  gap: 0.25rem;
+  margin-bottom: 0.5rem;
 }
 
 .option-label {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  font-size: 0.9rem;
+  gap: 0.35rem;
+  font-size: 0.8rem;
   color: #374151;
   cursor: pointer;
 }
 
 .option-label input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
+  width: 14px;
+  height: 14px;
   cursor: pointer;
 }
 
@@ -258,7 +258,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.75rem;
+  padding: 0.6rem 0.75rem;
   background-color: #ffffff;
   border: 1px solid #e0e0e0;
   border-radius: 4px;
@@ -270,7 +270,7 @@
 }
 
 .cart-item-text {
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   color: #374151;
   word-break: break-word;
 }
@@ -278,17 +278,17 @@
 .cart-item-right {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.5rem;
   flex-shrink: 0;
-  margin-left: 1rem;
+  margin-left: 0.5rem;
 }
 
 .cart-item-price {
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   font-weight: 500;
   color: #1f2937;
   text-align: right;
-  min-width: 80px;
+  min-width: 70px;
 }
 
 .remove-button {

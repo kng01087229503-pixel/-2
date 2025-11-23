@@ -1,85 +1,74 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import './App.css'
 
-// 임시 메뉴 데이터
-const menuData = [
-  {
-    id: 1,
-    name: '아메리카노(ICE)',
-    price: 4000,
-    description: '시원하고 깔끔한 아이스 아메리카노',
-    image: null,
-    options: [
-      { id: 1, name: '샷 추가', price: 500 },
-      { id: 2, name: '시럽 추가', price: 0 }
-    ]
-  },
-  {
-    id: 2,
-    name: '아메리카노(HOT)',
-    price: 4000,
-    description: '따뜻하고 진한 핫 아메리카노',
-    image: null,
-    options: [
-      { id: 1, name: '샷 추가', price: 500 },
-      { id: 2, name: '시럽 추가', price: 0 }
-    ]
-  },
-  {
-    id: 3,
-    name: '카페라떼',
-    price: 5000,
-    description: '부드러운 우유와 에스프레소의 조화',
-    image: null,
-    options: [
-      { id: 1, name: '샷 추가', price: 500 },
-      { id: 2, name: '시럽 추가', price: 0 }
-    ]
-  },
-  {
-    id: 4,
-    name: '카푸치노',
-    price: 5000,
-    description: '우유 거품이 올라간 클래식한 카푸치노',
-    image: null,
-    options: [
-      { id: 1, name: '샷 추가', price: 500 },
-      { id: 2, name: '시럽 추가', price: 0 }
-    ]
-  },
-  {
-    id: 5,
-    name: '카라멜 마키아토',
-    price: 6000,
-    description: '달콤한 카라멜과 에스프레소의 만남',
-    image: null,
-    options: [
-      { id: 1, name: '샷 추가', price: 500 },
-      { id: 2, name: '시럽 추가', price: 0 }
-    ]
-  },
-  {
-    id: 6,
-    name: '바닐라 라떼',
-    price: 5500,
-    description: '부드러운 바닐라 향이 일품인 라떼',
-    image: null,
-    options: [
-      { id: 1, name: '샷 추가', price: 500 },
-      { id: 2, name: '시럽 추가', price: 0 }
-    ]
-  }
-]
+const API_BASE_URL = 'http://localhost:3002'
 
 function App() {
   const [currentPage, setCurrentPage] = useState('order') // 'order' or 'admin'
+  const [menus, setMenus] = useState([])
   const [cart, setCart] = useState([])
-  const [orders, setOrders] = useState([]) // 주문 목록 (주문하기 화면에서 생성된 주문)
-  const [inventory, setInventory] = useState([
-    { menuId: 1, menuName: '아메리카노(ICE)', stock: 10 },
-    { menuId: 2, menuName: '아메리카노(HOT)', stock: 10 },
-    { menuId: 3, menuName: '카페라떼', stock: 10 }
-  ])
+  const [orders, setOrders] = useState([]) // 서버에서 조회한 주문 목록
+  const [inventory, setInventory] = useState([]) // 서버에서 조회한 재고
+  const [statistics, setStatistics] = useState({ total: 0, received: 0, inProgress: 0, completed: 0 })
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+
+  // 초기 메뉴 로딩
+  useEffect(() => {
+    const fetchMenus = async () => {
+      try {
+        setError(null)
+        const res = await fetch(`${API_BASE_URL}/api/menus`)
+        if (!res.ok) throw new Error('메뉴를 불러오지 못했습니다.')
+        const data = await res.json()
+        setMenus(data)
+      } catch (err) {
+        console.error(err)
+        setError('메뉴 로딩 중 오류가 발생했습니다.')
+      }
+    }
+    fetchMenus()
+  }, [])
+
+  // 관리자 페이지용 데이터 로딩
+  const loadAdminData = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+
+      const [inventoryRes, ordersRes, statsRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/api/inventory`),
+        fetch(`${API_BASE_URL}/api/orders`),
+        fetch(`${API_BASE_URL}/api/orders/statistics`)
+      ])
+
+      if (!inventoryRes.ok || !ordersRes.ok || !statsRes.ok) {
+        throw new Error('관리자 데이터를 불러오지 못했습니다.')
+      }
+
+      const [inventoryData, ordersData, statsData] = await Promise.all([
+        inventoryRes.json(),
+        ordersRes.json(),
+        statsRes.json()
+      ])
+
+      setInventory(inventoryData)
+      setOrders(ordersData)
+      setStatistics(statsData)
+    } catch (err) {
+      console.error(err)
+      setError('관리자 데이터 로딩 중 오류가 발생했습니다.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // 페이지 전환 시 관리자 데이터 로딩
+  useEffect(() => {
+    if (currentPage === 'admin') {
+      loadAdminData()
+    }
+  }, [currentPage])
 
   // 장바구니에 아이템 추가
   const addToCart = (menu, selectedOptions) => {
@@ -139,15 +128,14 @@ function App() {
   }, [cart])
 
   // 주문하기
-  const handleOrder = () => {
+  const handleOrder = async () => {
     if (cart.length === 0) {
       alert('장바구니가 비어있습니다.')
       return
     }
 
     try {
-      const newOrder = {
-        id: Date.now(),
+      const orderPayload = {
         items: cart.map(item => ({
           menuId: item.menuId,
           menuName: item.menuName,
@@ -156,11 +144,22 @@ function App() {
           price: item.totalPrice
         })),
         totalAmount: totalAmount,
-        orderDate: new Date(),
-        status: 'pending' // pending -> received -> inProgress -> completed
+        orderDate: new Date()
       }
 
-      setOrders([newOrder, ...orders])
+      const res = await fetch(`${API_BASE_URL}/api/orders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(orderPayload)
+      })
+
+      if (!res.ok) {
+        throw new Error('주문 생성에 실패했습니다.')
+      }
+
+      const createdOrder = await res.json()
+
+      setOrders([createdOrder, ...orders])
       alert(`주문이 완료되었습니다!\n총 금액: ${totalAmount.toLocaleString()}원`)
       setCart([])
     } catch (error) {
@@ -169,32 +168,47 @@ function App() {
     }
   }
 
-  // 주문 통계 계산 (메모이제이션)
-  const orderStatistics = useMemo(() => {
-    const total = orders.length
-    // pending 상태도 주문 접수로 카운트 (주문이 들어오면 처음에는 주문 접수 상태)
-    const received = orders.filter(o => o.status === 'received' || o.status === 'pending').length
-    const inProgress = orders.filter(o => o.status === 'inProgress').length
-    const completed = orders.filter(o => o.status === 'completed').length
-    return { total, received, inProgress, completed }
-  }, [orders])
-
   // 주문 상태 변경
-  const updateOrderStatus = (orderId, newStatus) => {
-    setOrders(orders.map(order => 
-      order.id === orderId ? { ...order, status: newStatus } : order
-    ))
+  const updateOrderStatus = async (orderId, newStatus) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/orders/${orderId}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+      })
+      if (!res.ok) throw new Error('주문 상태 변경에 실패했습니다.')
+
+      // 상태 변경 후 관리자 데이터 다시 로딩
+      await loadAdminData()
+    } catch (error) {
+      console.error('주문 상태 변경 중 오류가 발생했습니다:', error)
+      alert('주문 상태 변경 중 오류가 발생했습니다. 다시 시도해주세요.')
+    }
   }
 
   // 재고 수정
-  const updateInventory = (menuId, change) => {
-    setInventory(inventory.map(item => {
-      if (item.menuId === menuId) {
-        const newStock = Math.max(0, item.stock + change)
-        return { ...item, stock: newStock }
-      }
-      return item
-    }))
+  const updateInventory = async (menuId, change) => {
+    try {
+      const target = inventory.find(item => item.menuId === menuId)
+      if (!target) return
+      const newStock = Math.max(0, target.stock + change)
+
+      const res = await fetch(`${API_BASE_URL}/api/inventory/${menuId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stock: newStock })
+      })
+
+      if (!res.ok) throw new Error('재고 수정에 실패했습니다.')
+
+      const updated = await res.json()
+      setInventory(inventory.map(item => 
+        item.menuId === updated.menuId ? updated : item
+      ))
+    } catch (error) {
+      console.error('재고 수정 중 오류가 발생했습니다:', error)
+      alert('재고 수정 중 오류가 발생했습니다. 다시 시도해주세요.')
+    }
   }
 
   // 재고 상태 확인
@@ -208,9 +222,10 @@ function App() {
     <div className="app">
       <Header currentPage={currentPage} onPageChange={setCurrentPage} />
       <div className="main-content">
+        {error && <div className="error-message">{error}</div>}
         {currentPage === 'order' ? (
           <>
-            <MenuSection menus={menuData} onAddToCart={addToCart} />
+            <MenuSection menus={menus} onAddToCart={addToCart} />
             <CartSection 
               cart={cart} 
               total={totalAmount} 
@@ -220,7 +235,7 @@ function App() {
           </>
         ) : (
           <AdminPage
-            statistics={orderStatistics}
+            statistics={statistics}
             inventory={inventory}
             orders={orders}
             onUpdateInventory={updateInventory}
